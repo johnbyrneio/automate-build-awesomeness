@@ -1,0 +1,140 @@
+variable "prefix" {
+    type = "string"
+    description = "AWS region to deploy in. Ex: us-east-1"
+}
+
+variable "aws_region" {
+    type = "string"
+    description = "AWS region to deploy in. Ex: us-west-1"
+}
+
+variable "aws_key_name" {
+    type = "string"
+    description = "AWS SSH Key Name"
+}
+
+variable "aws_key_path" {
+    type = "string"
+    description = "Path to AWS SSH private key"
+}
+
+variable "aws_platform" {
+    type = "string"
+    description = "AWS platform - windows, windows_sql, centos6, centos7, ubuntu"
+}
+
+variable "aws_ami" {
+    type = "map"
+    description = "AWS AMI ID to use for provisioned instances"
+    default = {
+        windows = "ami-c06b24a0"
+        windows_sql = "ami-f76c2397"
+        centos6 = "ami-ac5f2fcc"
+        centos7 = "ami-af4333cf"
+        ubuntu = "ami-48db9d28"
+    }
+}
+
+variable "aws_ami_connection_user" {
+    type = "map"
+    description = "AWS AMI ID to use for provisioned instances"
+    default = {
+        windows = "Administrator"
+        windows_sql = "Administrator"
+        centos6 = "root"
+        centos7 = "centos"
+        ubuntu = "ubuntu"
+    }
+}
+
+variable "aws_ami_connection_type" {
+    type = "map"
+    description = "AWS AMI ID to use for provisioned instances"
+    default = {
+        windows = "winrm"
+        windows_sql = "winrm"
+        centos6 = "ssh"
+        centos7 = "ssh"
+        ubuntu = "ssh"
+    }
+}
+
+variable "aws_instance_type" {
+    type = "string"
+    description = "AWS instance type"
+}
+
+variable "aws_security_group" {
+    type = "list"
+    description = "AWS Security Group to apply to the instance"
+}
+
+variable "aws_subnet" {
+    type = "string"
+    description = "AWS Subnet to deploy instance within"
+}
+
+variable "chef_server" {
+    type = "string"
+    description = "Chef Server URL"
+}
+
+variable "chef_user_name" {
+    type = "string"
+    description = "Chef Server user name"
+}
+
+variable "chef_user_key" {
+    type = "string"
+    description = "Path to Chef SSH private key"
+}
+
+variable "chef_enterprise" {
+    type = "string"
+    description = "Chef Enterprise name"
+}
+
+variable "chef_organization" {
+    type = "string"
+    description = "Chef Organization name"
+}
+
+variable "chef_environment" {
+    type = "string"
+    description = "Chef Server Environment name"
+}
+
+variable "cookbook" {
+    type = "string"
+    description = "Cookbook to run for provisioning"
+}
+
+provider "aws" {
+    region = "${var.aws_region}"
+}
+
+resource "aws_instance" "chef-automate-environment-node" {
+    ami = "${lookup(var.aws_ami, var.aws_platform)}"
+    instance_type = "${var.aws_instance_type}"
+    tags {
+        Name = "${var.prefix}-${var.cookbook}-${var.chef_environment}"
+    }
+    key_name = "${var.aws_key_name}"
+    vpc_security_group_ids = "${var.aws_security_group}"
+    subnet_id = "${var.aws_subnet}"
+    provisioner "chef"  {
+        environment = "${var.chef_environment}"
+        run_list = ["delivery-base::default", "${var.cookbook}::default"]
+        node_name = "${var.cookbook}-${var.chef_environment}"
+        server_url = "${var.chef_server}"
+        fetch_chef_certificates = true
+        recreate_client = true
+        user_name = "${var.chef_user_name}"
+        user_key = "${file("${var.chef_user_key}")}"
+        connection {
+            type = "${lookup(var.aws_ami_connection_type, var.aws_platform)}"
+            user = "${lookup(var.aws_ami_connection_user, var.aws_platform)}"
+            private_key = "${file("${var.aws_key_path}")}"
+        }
+    }
+}
