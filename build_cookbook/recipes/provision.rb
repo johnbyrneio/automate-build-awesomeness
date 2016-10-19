@@ -65,6 +65,14 @@ file "#{terraform_plan_dir}/chef_user_key.pem" do
   action :create
 end
 
+if node['delivery']['change']['stage'] == 'acceptance'
+  # Add logic to destroy acceptance
+end
+
+stage_node_name = "#{node['delivery']['change']['project']}-#{workflow_chef_environment_for_stage}"
+
+stage_nodes = delivery_chef_server_search(:node, "name:#{stage_node_name}")
+
 execute 'Apply Terraform Plan' do
   command "#{terraform_cmd} apply --var-file main.tfvars"
   cwd terraform_plan_dir
@@ -74,4 +82,5 @@ execute 'Apply Terraform Plan' do
     })
   live_stream true
   action :run
+  only_if { stage_nodes.empty? }
 end
